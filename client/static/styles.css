@@ -1,0 +1,96 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    margin: 10px;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    margin: 0 auto;
+}
+
+input {
+    padding: 10px;
+    margin: 10px 0;
+}
+
+select{
+    padding: 10px;
+    margin: 10px 0;
+}    
+
+
+.welcome {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 20px;
+}
+
+.error-message {
+    color: red; /* Text color for error messages */
+    margin-bottom: 15px; /* Spacing below the error message */
+}
+
+.header {
+    display: flex;
+    justify-content: space-between; /* Aligns username on the left and logout on the right */
+    align-items: center; /* Vertically centers items in the header */
+    padding: 10px 20px; /* Padding for header */
+    background-color: #f5f5f5; /* Light background for the header */
+    border-bottom: 1px solid #ccc; /* Bottom border to separate from content */
+}
+
+.username {
+    font-size: 18px; /* Font size for username */
+}
+
+.logout {
+    display: flex;
+    align-items: center; /* Vertically centers the logout button */
+}
+
+.logout button {
+    /* background-color: transparent; No background for the button */
+    border: none; /* Remove border */
+    cursor: pointer; /* Pointer cursor for button */
+    font-size: 18px; /* Font size for logout button */
+}
+
+.logout button:hover {
+    color: rgb(255, 255, 255); /* Change color on hover for emphasis */
+}
+
+.container {
+    width: 300px; /* Adjust as needed for content */
+    margin: 50px auto; /* Center the container */
+    text-align: center; /* Center the text */
+}
+
+h1 {
+    margin-top: 20px; /* Margin for the welcome header */
+}

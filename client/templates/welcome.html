@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>Welcome</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .username {
+            font-size: 18px;
+        }
+
+        .account {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .logout {
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button {
+            background-color: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button:hover {
+            color: #FFCCCC;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #f4f4f4;
+            padding: 20px;
+            position: fixed;
+            top: 60px;
+            bottom: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .sidebar ul li {
+            margin: 15px 0;
+        }
+
+        .sidebar ul li a {
+            text-decoration: none;
+            color: #007BFF;
+            font-size: 16px;
+        }
+
+        .sidebar ul li a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            margin: 90px 0 0 270px; /* Adjust the left margin if needed */
+            padding: 20px;
+            flex-grow: 1;
+            display: flex; /* Use flexbox for centering */
+            flex-direction: column; /* Stack items vertically */
+            align-items: center; /* Center items horizontally */
+            text-align: center; /* Center text within each item */
+        }
+
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        .metamask-connected {
+            margin-top: 20px;
+            color: green;
+            font-size: 16px;
+        }
+        .pet-card {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            max-width: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center content horizontally */
+            justify-content: center; /* Center content vertically */
+            text-align: center; /* Center the text */
+        }
+
+        .pet-card h2 {
+            font-size: 18px; /* Smaller font size for the name */
+            margin: 5px 0;
+        }
+
+        .pet-card p {
+            font-size: 14px;
+            margin: 5px 0;  
+            overflow-wrap: anywhere; 
+        }
+
+        .pet-image {
+            max-width: 100%; /* Responsive image */
+            height: 150px; /* Set a fixed height for the image */
+            object-fit: cover; /* Make the image fit the container */
+            border-radius: 5px;
+        }
+        .inline-content {
+            display: flex;
+            justify-content: space-between; /* Align <h4> and <p> on the same line */
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap; /* Ensure it wraps content if it overflows */
+            width: 100%; /* Ensure it doesn't exceed the width of the card */
+            box-sizing: border-box; /* Ensure padding is included in width calculation */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="username">
+            Hello, <span class="username-display">{{.Username}}</span>
+            (<span class="account" id="account-display">{{if .WalletAddress}}{{.WalletAddress}}{{else}}Click to connect MetaMask{{end}}</span>)
+        </div>
+        <div class="logout">
+            <form id="logout-form" action="/logout" method="POST">
+                <button type="submit">
+                    <i class="fa fa-sign-out" style="font-size:24px"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <h2>Pet Shop</h2>
+        <ul>
+            {{if eq .UserType "seller"}}
+                <li><a href="/view-pets">List Pets</a></li>
+                <li><a href="/view-products">List Products</a></li>
+            {{end}}
+            {{if eq .UserType "purchaser"}}
+                <li><a href="/view-pets">Buy Pets</a></li>
+                <li><a href="/view-products">Buy Products</a></li>
+                <li><a href="/order-history">Order History</a></li>
+            {{end}}
+        </ul>
+    </div>
+
+    <div class="container">
+        <h1>Welcome to the PetShop</h1>
+        <p>Your pets:</p>
+        <div id="pets-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+    <script>
+        const contractABI = JSON.parse(`{{ .ContractABI }}`);
+        const contractAddress = "{{ .ContractAddress }}";
+        const walletAddress = "{{ .WalletAddress }}";
+
+        function displayAccount(account) {
+            const accountDisplay = document.getElementById('account-display');
+            accountDisplay.textContent = account;
+        }
+
+        async function connectMetaMaskAndSave() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    const walletAddress = accounts[0];
+                    console.log(accounts)
+                    displayAccount(walletAddress);
+
+                    await fetch('/save-metamask-account', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ metamask_account: walletAddress }),
+                    });
+
+                } catch (error) {
+                    console.error('MetaMask connection error:', error);
+                }
+            } else {
+                alert('MetaMask is not installed. Please install MetaMask to continue.');
+            }
+        }
+
+        async function fetchPets() {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner(walletAddress);
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, signer);
+            console.log(window.ethereum)
+            const petCount = await contract.getMyPets();
+
+            const petsContainer = document.getElementById('pets-container');
+            petsContainer.innerHTML = '';
+
+            if (petCount.length === 0) {
+                const noPetsMessage = document.createElement('p');
+                noPetsMessage.textContent = "You don't own any pets.";
+                noPetsMessage.style.color = 'red';
+                noPetsMessage.style.fontSize = '18px';
+                noPetsMessage.style.textAlign = 'center';
+                petsContainer.appendChild(noPetsMessage);
+                return;
+            }
+
+            for (let i = 0; i < petCount.length; i++) {
+                const petData = await contract.getItem(petCount[i]); // Use pet ID for lookup
+                const petCard = createPetCard(petData);
+                petsContainer.appendChild(petCard);
+            }
+        }
+
+        function createPetCard(petData) {
+            const petCard = document.createElement('div');
+            petCard.className = 'pet-card';
+
+            petCard.innerHTML = `
+                <h2>${petData[0]}</h2>
+                <div class="inline-content">
+                    <h4>Description:</h4>
+                    <p>${petData[1]}</p>
+                </div>
+                <img class="pet-image" src="${petData[3]}" alt="${petData[0]}"> <!-- Pet Image (IPFS URL) -->
+                <div class="inline-content">
+                    <h4>Owner:</h4>
+                    <p>${petData[4]}</p>
+                </div>
+                <br>
+            `;
+            return petCard;
+        }
+
+        document.getElementById('account-display').addEventListener('click', connectMetaMaskAndSave);
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const walletAddress = document.getElementById('account-display').textContent;
+            if (walletAddress === "Click to connect MetaMask") {
+                connectMetaMaskAndSave();
+            }
+            // fetchPets();
+        });
+        window.addEventListener('load', fetchPets);
+    </script>
+</body>
+</html>

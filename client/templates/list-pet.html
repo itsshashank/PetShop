@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+    <title>Register Pet</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .username {
+            font-size: 18px;
+        }
+
+        .logout {
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button {
+            background-color: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button:hover {
+            color: #FFCCCC;
+        }
+
+        .container {
+            margin-top: 60px;
+            padding: 20px;
+        }
+        
+        #image-preview {
+            max-width: 300px; 
+            max-height: 300px; 
+            display: none; 
+            margin-top: 10px; 
+        }
+        
+        #loading {
+            display: none; /* Hidden by default */
+            color: green;
+            margin-top: 10px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="username">
+            Hello, <span class="username-display">{{.Username}}</span>
+        </div>
+        <div class="logout">
+            <form id="logout-form" action="/logout" method="POST">
+                <button type="submit">
+                    <i class="fa fa-sign-out" style="font-size:24px"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- <div class="container"> -->
+        <h1>Register a Pet</h1>
+        <form id="pet-form" enctype="multipart/form-data">
+            <label for="name">Pet Name:</label>
+            <input type="text" id="name" name="name" required><br><br>
+    
+            <label for="description">Pet Description:</label>
+            <textarea id="description" name="description" required></textarea><br><br>
+    
+            <label for="price">Price (in ETH):</label>
+            <input type="number" id="price" name="price" required min="0"><br><br>
+    
+            <label for="image">Upload Pet Image:</label>
+            <input type="file" id="image" name="image" accept="image/*" required><br><br>
+            <img id="image-preview" src="#" alt="Image Preview">
+    
+            <button type="button" onclick="submitPet()">List Pet</button>
+            <div id="loading">Listing pet...</div>
+        </form>
+    <!-- </div> -->
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+    <script>
+        // Get contract details from the template
+        const contractABI = JSON.parse(`{{ .ContractABI }}`);
+        const contractAddress = "{{ .ContractAddress }}";
+
+        document.getElementById('image').addEventListener('change', function () {
+            const file = this.files[0];
+            const imagePreview = document.getElementById('image-preview');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                imagePreview.style.display = 'none';
+            }
+        });
+
+        async function submitPet() {
+            const form = document.getElementById('pet-form');
+            const formData = new FormData(form);
+            const loadingIndicator = document.getElementById('loading');
+
+            loadingIndicator.style.display = 'block'; // Show loading indicator
+
+            try {
+                const imageFile = formData.get('image');
+                const ipfsUrl = await uploadToIPFS(imageFile);
+                
+                if (ipfsUrl) {
+                    const userAccount = await getMetaMaskAccount();
+                    if (userAccount) {
+                        const petData = {
+                            name: formData.get('name'),
+                            description: formData.get('description'),
+                            price: formData.get('price'),
+                            ipfsUrl: ipfsUrl,
+                            userAccount: userAccount,
+                            abi: contractABI.abi,
+                            contractAddress: contractAddress
+                        };
+                        await sendTransactionToEthereum(petData);
+                        form.reset(); // Clear the form after successful submission
+                        document.getElementById('image-preview').style.display = 'none'; // Reset image preview
+                    }
+                } else {
+                    alert('Error uploading image to IPFS.');
+                }
+            } catch (error) {
+                console.error("Error in submitting pet:", error);
+                alert('An error occurred while submitting the pet.');
+            } finally {
+                loadingIndicator.style.display = 'none'; // Hide loading indicator
+            }
+        }
+
+        async function uploadToIPFS(imageFile) {
+            const formData = new FormData();
+            formData.append("file", imageFile);
+
+            const response = await fetch('http://localhost:5001/api/v0/add', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return `https://ipfs.io/ipfs/${data.Hash}`;
+            } else {
+                return null;
+            }
+        }
+
+        async function getMetaMaskAccount() {
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    return accounts[0];
+                } catch (error) {
+                    console.error("Error retrieving MetaMask account:", error);
+                    return null;
+                }
+            } else {
+                alert("Please install MetaMask!");
+                return null;
+            }
+        }
+
+        async function sendTransactionToEthereum(petData) {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner(petData.userAccount);
+
+            const contract = new ethers.Contract(petData.contractAddress, petData.abi, signer);
+
+            try {
+                const tx = await contract.listItem(
+                    petData.name,
+                    petData.description,
+                    ethers.utils.parseEther(petData.price.toString()),
+                    0,
+                    petData.ipfsUrl,
+                    true
+                );
+                console.log("Transaction sent:", tx.hash);
+                await tx.wait();
+                alert("Pet listed successfully!");
+            } catch (error) {
+                console.error("Error sending transaction:", error);
+                alert("Transaction failed!");
+            }
+        }
+    </script>
+</body>
+</html>

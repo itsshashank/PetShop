@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>View Pets</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .username {
+            font-size: 18px;
+        }
+
+        .logout {
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button {
+            background-color: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button:hover {
+            color: #FFCCCC;
+        }
+
+        .register-pet {
+            background-color: white;
+            color: #007BFF;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .register-pet:hover {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .container {
+            margin-top: 60px;
+            padding: 20px;
+        }
+
+        /* Smaller pet card */
+        .pet-card {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            max-width: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center content horizontally */
+            justify-content: center; /* Center content vertically */
+            text-align: center; /* Center the text */
+        }
+
+        .pet-card h2 {
+            font-size: 18px; /* Smaller font size for the name */
+            margin: 5px 0;
+        }
+
+        .pet-card p {
+            font-size: 14px;
+            margin: 5px 0;  
+            overflow-wrap: anywhere; 
+        }
+
+        .pet-image {
+            max-width: 100%; /* Responsive image */
+            height: 150px; /* Set a fixed height for the image */
+            object-fit: cover; /* Make the image fit the container */
+            border-radius: 5px;
+        }
+
+        .buy-button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .buy-button:hover {
+            background-color: #218838;
+        }
+        .inline-content {
+            display: flex;
+            justify-content: space-between; /* Align <h4> and <p> on the same line */
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap; /* Ensure it wraps content if it overflows */
+            width: 100%; /* Ensure it doesn't exceed the width of the card */
+            box-sizing: border-box; /* Ensure padding is included in width calculation */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="username">
+            Hello, <span class="username-display">{{.Username}}</span>
+        </div>
+        <div class="logout">
+            {{if eq .UserType "seller"}}
+            <button class="register-pet" onclick="location.href='/list-pet'">
+                Register a Pet
+            </button>
+            {{end}}
+            <form id="logout-form" action="/logout" method="POST">
+                <button type="submit">
+                    <i class="fa fa-sign-out" style="font-size:24px"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Available Pets</h1>
+        <div id="pets-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+    <script>
+        const contractABI = JSON.parse(`{{ .ContractABI }}`);
+        const contractAddress = "{{ .ContractAddress }}";
+        const walletAddress = "{{ .WalletAddress }}";
+        const userType = "{{.UserType}}";
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                return accounts[0];
+            } else {
+                alert("Please install MetaMask!");
+                return null;
+            }
+        }
+        
+        async function fetchPets() {
+            const userAccount = await connectMetaMask();
+            if (!userAccount) return;
+
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, provider);
+            const petCount = await contract.getAvailablePets();
+
+            const petsContainer = document.getElementById('pets-container');
+            petsContainer.innerHTML = ''; // Clear previous content
+
+            for (let i = 0; i < petCount.length; i++) {
+                const petData = await contract.getItem(petCount[i]); // Use pet ID for lookup
+                const petCard = createPetCard(petData);
+                petsContainer.appendChild(petCard);
+            }
+        }
+
+        function createPetCard(petData) {
+            console.log("petData",petData)
+            const petCard = document.createElement('div');
+            petCard.className = 'pet-card';
+
+            petCard.innerHTML = `
+                <h2>${petData[0]}</h2>
+                <div class="inline-content">
+                    <h4>Description:</h4>
+                    <p>${petData[1]}</p>
+                </div>
+                <div class="inline-content">
+                    <h4>Price:</h4>
+                    <p>${ethers.utils.formatEther(petData[2])} ETH</p> <!-- Price -->
+                </div>
+                <img class="pet-image" src="${petData[3]}" alt="${petData[0]}"> <!-- Pet Image (IPFS URL) -->
+                <div class="inline-content">
+                    <h4>Owner:</h4>
+                    <p>${petData[4]}</p>
+                </div>
+                <br>
+            `;
+
+            if (userType === "purchaser") {
+                const buyButton = document.createElement('button');
+                buyButton.innerText = 'Buy';
+                buyButton.className = 'buy-button';
+                buyButton.onclick = async () => {
+                    await buyPet(petData); // Assuming pet ID is the 6th element in petData
+                };
+
+                petCard.appendChild(buyButton);
+            }
+
+            return petCard;
+        }
+
+        async function buyPet(petData) {
+            alert(`Buying pet with ID: ${petData[5]}`);
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner(walletAddress);
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, signer);
+            try {
+            const tx = await contract.buyPet(petData[5], {
+                value: petData[2]
+            });
+
+            console.log("Transaction sent:", tx.hash);
+
+            await tx.wait();
+            console.log("Transaction confirmed:", tx.hash);
+            } catch (error) {
+                console.error("Error buying pet:", error);
+                alert("Transaction failed: " + error.message);
+            }
+        }
+
+        window.addEventListener('load', fetchPets);
+    </script>
+</body>
+</html>

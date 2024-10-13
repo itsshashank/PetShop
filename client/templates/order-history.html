@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>Order History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .username {
+            font-size: 18px;
+        }
+
+        .logout {
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button {
+            background-color: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button:hover {
+            color: #FFCCCC;
+        }
+
+        .container {
+            margin-top: 60px;
+            padding: 20px;
+        }
+
+        .order-card {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .order-card h2 {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+
+        .order-card p {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .order-card img {
+            max-width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="username">
+            Hello, <span class="username-display">{{ .Username }}</span>
+        </div>
+        <div class="logout">
+            <form id="logout-form" action="/logout" method="POST">
+                <button type="submit">
+                    <i class="fa fa-sign-out" style="font-size:24px"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Order History</h1>
+        <div id="order-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+    <script>
+        const contractABI = JSON.parse(`{{ .ContractABI }}`);
+        const contractAddress = "{{ .ContractAddress }}";
+        const walletAddress = "{{ .WalletAddress }}";
+
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                return accounts[0];
+            } else {
+                alert("Please install MetaMask!");
+                return null;
+            }
+        }
+
+        async function fetchOrderHistory() {
+            const userAccount = await connectMetaMask();
+            if (!userAccount) return;
+
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner(walletAddress);
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, signer);
+
+            const orderHistory = await contract.getOrderHistory();
+
+            const orderContainer = document.getElementById('order-container');
+            orderContainer.innerHTML = ''; // Clear previous content
+
+            for (let i = 0; i < orderHistory.length; i++) {
+                const orderData = orderHistory[i];
+                const orderCard = createOrderCard(orderData);
+                orderContainer.appendChild(orderCard);
+            }
+        }
+
+        function createOrderCard(orderData) {
+            const orderCard = document.createElement('div');
+            orderCard.className = 'order-card';
+
+            const totalPrice = ethers.utils.formatEther(orderData.totalPrice); // Convert price to Ether
+
+            orderCard.innerHTML = `
+                <h2>Order ID: ${orderData.orderId}</h2>
+                <p>Product: ${orderData.productName}</p>
+                <img src="${orderData.ipfsUrl}" alt="${orderData.productName}">
+                <p>Quantity: ${orderData.quantity}</p>
+                <p>Total Price: ${totalPrice} ETH</p>
+                <p>Date: ${new Date(orderData.timestamp * 1000).toLocaleString()}</p>
+            `;
+
+            return orderCard;
+        }
+
+        window.addEventListener('load', fetchOrderHistory);
+    </script>
+</body>
+</html>

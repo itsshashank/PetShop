@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <title>View Products</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .username {
+            font-size: 18px;
+        }
+
+        .logout {
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button {
+            background-color: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logout button:hover {
+            color: #FFCCCC;
+        }
+
+        .register-product {
+            background-color: white;
+            color: #007BFF;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .register-product:hover {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .container {
+            margin-top: 60px;
+            padding: 20px;
+        }
+
+        /* Product card styling */
+        .product-card {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            max-width: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center content horizontally */
+            justify-content: center; /* Center content vertically */
+            text-align: center; /* Center the text */
+        }
+
+        .product-card h2 {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+
+        .product-card p {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .product-image {
+            max-width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+        .buy-button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .buy-button:hover {
+            background-color: #218838;
+        }
+        .inline-content {
+            display: flex;
+            justify-content: space-between; /* Align <h4> and <p> on the same line */
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap; /* Ensure it wraps content if it overflows */
+            width: 100%; /* Ensure it doesn't exceed the width of the card */
+            box-sizing: border-box; /* Ensure padding is included in width calculation */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="username">
+            Hello, <span class="username-display">{{.Username}}</span>
+        </div>
+        <div class="logout">
+            {{if eq .UserType "seller"}}
+            <button class="register-product" onclick="location.href='/list-product'">
+                Register a Product
+            </button>
+            {{end}}
+            <form id="logout-form" action="/logout" method="POST">
+                <button type="submit">
+                    <i class="fa fa-sign-out" style="font-size:24px"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Available Products</h1>
+        <div id="product-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+    <script>
+        const contractABI = JSON.parse(`{{ .ContractABI }}`);
+        const contractAddress = "{{ .ContractAddress }}";
+        const userType = "{{.UserType}}";
+        const walletAddress = "{{ .WalletAddress }}";
+
+        async function connectMetaMask() {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                return accounts[0];
+            } else {
+                alert("Please install MetaMask!");
+                return null;
+            }
+        }
+
+        async function fetchProducts() {
+            const userAccount = await connectMetaMask();
+            if (!userAccount) return;
+
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, provider);
+
+            const products = await contract.getAvailableProducts();
+
+            const productContainer = document.getElementById('product-container');
+            productContainer.innerHTML = ''; // Clear previous content
+
+            for (let i = 0; i < products.length; i++) {
+                const productData = await contract.getItem(products[i]); // Use pet ID for lookup
+                console.log(productData);
+                const productCard = createProductCard(productData);
+                productContainer.appendChild(productCard);
+            }
+        }
+
+        function createProductCard(productData) {
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card';
+
+            const productPrice = ethers.utils.formatEther(productData[2]); // Convert price to Ether
+
+            productCard.innerHTML = `
+                <h2>${productData[0]}</h2>
+                <div class="inline-content">
+                    <h4>Description:</h4>
+                    <p>${productData[1]}</p>
+                </div>
+                <div class="inline-content">
+                    <h4>Price per unit:</h4>
+                    <p>${productPrice} ETH</p> <!-- Price per unit -->
+                </div>
+                <div class="inline-content">
+                    <h4>Available Quantity:</h4>
+                    <p>${productData[6]}</p> <!-- Available quantity -->
+                </div>
+                <img class="product-image" src="${productData[3]}" alt="${productData[0]}"> <!-- Product Image (IPFS URL) -->
+                <br>
+            `;
+
+            // Only show the quantity slider and buy button if the userType is "purchaser"
+            if (userType === "purchaser") {
+                // Add quantity selection and total price calculation for purchaser
+                const sliderSection = document.createElement('div');
+                sliderSection.innerHTML = `
+                    <div class="inline-content">
+                        <h4>Select Quantity:</h4>
+                        <input type="range" min="1" max="${productData[6]}" value="1" class="quantity-slider" id="quantity-slider-${productData[5]}" />
+                        <span id="selected-quantity-${productData[5]}">1</span> <!-- Display selected quantity -->
+                    </div>
+                    <div class="inline-content">
+                        <h4>Total Price:</h4>
+                        <p id="total-price-${productData[5]}">${productPrice} ETH</p> <!-- Total price initially -->
+                    </div>
+                    <br>
+                `;
+
+                // Append slider section to the product card
+                productCard.appendChild(sliderSection);
+
+                // Add event listener to update quantity and total price when slider is moved
+                const slider = sliderSection.querySelector(`#quantity-slider-${productData[5]}`);
+                slider.addEventListener('input', (event) => {
+                    const selectedQuantity = event.target.value;
+                    const totalPrice = (productPrice * selectedQuantity).toFixed(4); // Calculate total price
+                    document.getElementById(`selected-quantity-${productData[5]}`).textContent = selectedQuantity;
+                    document.getElementById(`total-price-${productData[5]}`).textContent = `${totalPrice} ETH`;
+                });
+
+                // Add Buy button for purchaser
+                const buyButton = document.createElement('button');
+                buyButton.innerText = 'Buy';
+                buyButton.className = 'buy-button';
+                buyButton.onclick = async () => {
+                    const quantity = slider.value;
+                    await buyProduct(productData[5], quantity, productPrice); // Pass product ID, quantity, and price
+                };
+
+                productCard.appendChild(buyButton);
+            }
+
+            return productCard;
+        }
+
+        async function buyProduct(productId, quantity, pricePerUnit) {
+            const totalAmount = ethers.utils.parseEther((pricePerUnit * quantity).toString()); // Total price in Wei
+
+            // Logic for sending transaction to contract
+            alert(`Buying product with ID: ${productId}, Quantity: ${quantity}, Total Amount: ${ethers.utils.formatEther(totalAmount)} ETH`);
+
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner(walletAddress);
+                const contract = new ethers.Contract(contractAddress, contractABI.abi, signer);
+                const tx = await contract.buyProduct(productId, quantity, { value: totalAmount });
+                await tx.wait();
+                alert('Purchase successful!');
+            } catch (error) {
+                console.error('Error buying product:', error);
+                alert('Error during purchase: ' + error.message);
+            }
+        }
+
+
+        window.addEventListener('load', fetchProducts);
+    </script>
+</body>
+</html>
